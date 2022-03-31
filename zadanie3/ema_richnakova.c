@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 #define MAX_STRLEN 1001
 
@@ -15,11 +17,10 @@ void removeChars(char *str, bool dFlag, bool pFlag) {
     int len = strlen(str);
     for (int i = 0; i < len; i++) {
         if (!isLetterOrSpace(str[i])) {
-            if ((dFlag && isdigit(str[i])) ||
-            (pFlag && ispunct(str[i]))) { 
+            if ((dFlag && isdigit(str[i])) || (pFlag && ispunct(str[i]))) { 
                 continue;
             }
-            strcpy(&str[i], &str[i+1]);
+            memmove(&str[i], &str[i+1], strlen(str) + 1);
             len--;
             i--;
         }
@@ -96,31 +97,32 @@ void rFunction(char *str, char *replaceStr, char nonOptArgs[][100], int nonOptAr
 int main(int argc, char *argv[]) {
 	int opt; // options from terminal
 	char *optstring = ":dpulr:R:";
-    bool dFlag = 0, pFlag = 0;
-    bool uFlaf = 0, lFlag = 0;
-    bool rFlag = 0, RFlag = 0;
+    bool dFlag = false, pFlag = false;
+    bool uFlaf = false, lFlag = false;
+    bool rFlag = false, RFlag = false;
     char str[MAX_STRLEN]; // string to process
+    char *strPtr;
     char replaceStr[MAX_STRLEN]; // parameter after -r/-R
     
     while ((opt = getopt(argc, argv, optstring)) != -1) { // get options
         switch (opt) {
             case 'd': // with numbers
-                dFlag = 1;
+                dFlag = true;
                 break;
             case 'p': // with punctuation
-                pFlag = 1;
+                pFlag = true;
                 break;
             case 'u': // to upper
-            	uFlaf = 1;
+            	uFlaf = true;
             	break;
             case 'l': // to lower
-                lFlag = 1;
+                lFlag = true;
                 break;
             case 'r': // case-sensitive replace
-                rFlag = 1;
+                rFlag = true;
                 break;
             case 'R': // case-insensitive replace
-            	RFlag = 1;
+            	RFlag = true;
             	break;
             case '?':
                 return 1; // situation 1 - invalid option
@@ -143,25 +145,26 @@ int main(int argc, char *argv[]) {
     	}
     }
     if (rFlag || RFlag) {
-        strcpy(replaceStr, argv[optind-1]+3);
+        strcpy(replaceStr, argv[optind-1]);
     }
 
     while (fgets(str, MAX_STRLEN, stdin) != NULL) {
         if (!strcmp(str, "\n")) { return 0; }
+        strPtr = str;
 
         // default, -d or -p input functionality
-        removeChars(&str, dFlag, pFlag);
+        removeChars(strPtr, dFlag, pFlag);
 
         if (uFlaf) {
-            uFunction(&str);
+            uFunction(strPtr);
         } else if (lFlag) {
-            lFunction(&str);
+            lFunction(strPtr);
         }
 
-        if (rFlag) { // iba replace obyc
-            rFunction(&str, replaceStr, nonOptArgs, nonOptArgNum, true);
-        } else if (RFlag) { // AHOJ 
-            rFunction(&str, replaceStr, nonOptArgs, nonOptArgNum, false);
+        if (rFlag) {
+            rFunction(strPtr, replaceStr, nonOptArgs, nonOptArgNum, true);
+        } else if (RFlag) {
+            rFunction(strPtr, replaceStr, nonOptArgs, nonOptArgNum, false);
         }
 
         printf("%s\n", str);
