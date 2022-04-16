@@ -28,12 +28,67 @@ char* getOptArgument(int appOpt, int argc, char *argv[]) {
     }
 }
 
-void printDB(int *filteredIndexes, int size, bool itemPrint) {
+bool isStrNumber(double d, char* str) {
+    return (d == 0 && !isdigit(str[0])) ? false : true;
+}
+
+int getGPSClosestIndex(char* strLat, char* strLon) {
+    float lat = atof(strLat);
+    float lon = atof(strLon);
+    int closestIndex = 0;
+    double closestDist = DBL_MAX;
+    double possibleClosestDist;
+
+    for (int i = 0; i < DB_NUM; i++) {
+        possibleClosestDist = distance(db[i].gps, (GPS){lat, lon});
+        if (possibleClosestDist  <  closestDist) {
+            closestDist = possibleClosestDist;
+            closestIndex = i;
+        }
+    }
+    
+    return closestIndex;
+}
+
+void printDB(int *filteredIndexes, int size, bool itemPrint, OPT optT, OPT optP) {
     int count = 1;
-    for (int i = 0; i < size; i++) {
-        int fi = filteredIndexes[i];
-        for (int j = 0; j < db[fi].n; j++) {
-            printf("%d. %s %d : %s %.03lf %.03lf %d\n", count++, db[fi].items[j].name, db[fi].items[j].price, db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
+    if (itemPrint) {
+        for (int i = 0; i < size; i++) {
+            int fi = filteredIndexes[i];
+            for (int j = 0; j < db[fi].n; j++) {
+                if (optT.flag) {
+                    if (!strcmp(db[fi].items[j].name, optT.arg)) {
+                        printf("%d. %s %d : %s %.03lf %.03lf %d\n", count++, db[fi].items[j].name, db[fi].items[j].price, db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
+                    }
+                    continue;
+                } else if (optP.flag) {
+                    if (db[fi].items[j].price <= atoi(optP.arg)) {
+                        printf("%d. %s %d : %s %.03lf %.03lf %d\n", count++, db[fi].items[j].name, db[fi].items[j].price, db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
+                    }
+                    continue;
+                }
+                printf("%d. %s %d : %s %.03lf %.03lf %d\n", count++, db[fi].items[j].name, db[fi].items[j].price, db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
+            }
+        }
+    } else {
+        for (int i = 0; i < size; i++) {
+            count = 1;
+            int fi = filteredIndexes[i];
+            printf("%s %.03lf %.03lf %d :\n", db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
+            for (int j = 0; j < db[fi].n; j++) {
+                if (optT.flag) {
+                    if (!strcmp(db[fi].items[j].name, optT.arg)) {
+                        printf("%d. %s %d\n", count++, db[fi].items[j].name, db[fi].items[j].price);
+                    }
+                    continue;
+                } else if (optP.flag) {
+                    if (db[fi].items[j].price <= atoi(optP.arg)) {
+                        printf("%d. %s %d\n", count++, db[fi].items[j].name, db[fi].items[j].price);
+                    }
+                    continue;
+                }
+                printf("%d. %s %d\n", count++, db[fi].items[j].name, db[fi].items[j].price);
+            }
         }
     }
 }
@@ -83,14 +138,15 @@ int main(int argc, char *argv[]) {
         }
     }
     // other error situations
-    if (!(optN.flag && optE.flag)) {
+    if ((optN.flag != optE.flag)) {
         return 3; // situation 3 - -n and -e must be entered together
     }
     if (optN.flag && optE.flag) {
         double lat = strtod(optN.arg, NULL);
-        double lon = strtod(optN.arg, NULL);
-        if ((lat > 90 || lat < -90) && (lon > 180 || lon < -180)) {
-            return 4; // situation 4 - latitude is not in range <-90,90> or longitude is not in range <-180,180>
+        double lon = strtod(optE.arg, NULL);
+        if (!(isStrNumber(lat, optN.arg) && isStrNumber(lon, optE.arg) &&
+            (lat <= 90 || lat >= -90) && (lon <= 180 || lon >= -180))) {
+            return 4; // situation 4 - latitude is not in range <-90,90> or longitude is not in range <-180,180> or they are not a number
         }
     }
 
@@ -115,42 +171,16 @@ int main(int argc, char *argv[]) {
         }
         filteredNum = k;
     } else if (optN.flag && optE.flag) {
-        float lat = strtod(optN.arg, NULL);
-        float lon = strtod(optE.arg, NULL);
-        int closestIndex = 0;
-        double closestLat = DBL_MAX;
-        double closestLon = DBL_MAX;
-        for (int i = 0; i < DB_NUM; i++) {
-            if (fabs(db[i].gps.lat - lat) < closestLat && fabs(db[i].gps.lon - lon) < closestLon) {
-                closestLat = fabs(db[i].gps.lat - lat);
-                closestLon = fabs(db[i].gps.lon - lon);
-                closestIndex = i;
-            } else if (fabs(db[i].gps.lat - lat) < closestLat || fabs(db[i].gps.lon - lon) < closestLon) {
-                double possibleClosestLat = fabs(db[i].gps.lat - lat);
-                double possibleClosestLon = fabs(db[i].gps.lon - lon);
-                if (fabs(possibleClosestLat - possibleClosestLon) < fabs(closestLat - closestLon)) {
-                    closestLat = possibleClosestLat;
-                    closestLon = possibleClosestLon;
-                    closestIndex = i;
-                }
-            }
-        }
-        filteredIndexes[0] = closestIndex;
+        filteredIndexes[0] = getGPSClosestIndex(optN.arg, optE.arg);
         filteredNum = 1;
     } else {
         for (int i = 0; i < DB_NUM; i++) {
             filteredIndexes[i] = i;
         }
+        filteredNum = DB_NUM;
     }
 
-    // filter warehouses items by -t or -p
-    if (optT.flag) {
-
-    } else if (optP.flag) {
-        
-    }
-
-    printDB(filteredIndexes, filteredNum, !optW.flag);
+    printDB(filteredIndexes, filteredNum, !optW.flag, optT, optP);
 
 	return 0;
-} 
+}

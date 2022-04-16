@@ -1,15 +1,7 @@
-1. glaze 47 : Hlohovec 48.431 17.803 15
-2. marinade 85 : Hlohovec 48.431 17.803 15
-3. ketchup 64 : Hlohovec 48.431 17.803 15
-4. vinegar 95 : Hlohovec 48.431 17.803 15
-5. soda 38 : Hlohovec 48.431 17.803 15
-6. pie 37 : Hlohovec 48.431 17.803 15
-7. burger 87 : Hlohovec 48.431 17.803 15
-8. foie gras 46 : Hlohovec 48.431 17.803 15
-9. toast 64 : Hlohovec 48.431 17.803 15
-10. hamburger 16 : Hlohovec 48.431 17.803 15
-11. nut 53 : Hlohovec 48.431 17.803 15
-12. biscuit 17 : Hlohovec 48.431 17.803 15
-13. broth 1 : Hlohovec 48.431 17.803 15
-14. wine 76 : Hlohovec 48.431 17.803 15
-15. steak 54 : Hlohovec 48.431 17.803 15
+1. caramel 70 : Banska Bystrica 48.735 19.145 7
+2. pot 65 : Banska Bystrica 48.735 19.145 7
+3. butter 61 : Banska Bystrica 48.735 19.145 7
+4. rice 23 : Banska Bystrica 48.735 19.145 7
+5. burger 34 : Banska Bystrica 48.735 19.145 7
+6. hamburger 82 : Banska Bystrica 48.735 19.145 7
+7. taco 99 : Banska Bystrica 48.735 19.145 7
