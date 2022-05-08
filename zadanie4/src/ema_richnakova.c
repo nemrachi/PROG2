@@ -1,11 +1,16 @@
 #include <stdio.h>
-#include <unistd.h>
-#include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <float.h>
+#include <unistd.h>
 #include "config.h"
+
+// gcc -Wall -Wextra ema_richnakova.c -o ema_richnakova && ./ema_richnakova
+
+typedef char bool;
+#define true 1
+#define false 0
+
+#define EMPTY_STR ""
 
 typedef struct opt {
     bool flag; // if opt was enetered
@@ -26,161 +31,136 @@ char* getOptArgument(int appOpt, int argc, char *argv[]) {
             return argv[i+1];
         }
     }
+    return NULL;
 }
 
-bool isStrNumber(double d, char* str) {
-    return (d == 0 && !isdigit(str[0])) ? false : true;
-}
+int getWarehouses(WAREHOUSE **db) {
+    FILE *warehouseFp = fopen(WAREHOUSE_DB_FILE, "r");
+    if (warehouseFp == NULL) { exit(1); }
+    int lineLen = MAX_NAME+20;
+    char line[lineLen];
+    int j = 0, word = 0, k = 0;
+    char lineWords[4][MAX_NAME];
+    int dbNum = 0;
 
-int getGPSClosestIndex(char* strLat, char* strLon) {
-    float lat = atof(strLat);
-    float lon = atof(strLon);
-    int closestIndex = 0;
-    double closestDist = DBL_MAX;
-    double possibleClosestDist;
-
-    for (int i = 0; i < DB_NUM; i++) {
-        possibleClosestDist = distance(db[i].gps, (GPS){lat, lon});
-        if (possibleClosestDist  <  closestDist) {
-            closestDist = possibleClosestDist;
-            closestIndex = i;
-        }
+    while (fgets(line, lineLen, warehouseFp)) { // count warehouses
+        dbNum++;
     }
-    
-    return closestIndex;
-}
+    *db = malloc(dbNum*sizeof(WAREHOUSE));
 
-void printDB(int *filteredIndexes, int size, bool itemPrint, OPT optT, OPT optP) {
-    int count = 1;
-    if (itemPrint) {
-        for (int i = 0; i < size; i++) {
-            int fi = filteredIndexes[i];
-            for (int j = 0; j < db[fi].n; j++) {
-                if (optT.flag) {
-                    if (!strcmp(db[fi].items[j].name, optT.arg)) {
-                        printf("%d. %s %d : %s %.03lf %.03lf %d\n", count++, db[fi].items[j].name, db[fi].items[j].price, db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
-                    }
-                    continue;
-                } else if (optP.flag) {
-                    if (db[fi].items[j].price <= atoi(optP.arg)) {
-                        printf("%d. %s %d : %s %.03lf %.03lf %d\n", count++, db[fi].items[j].name, db[fi].items[j].price, db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
-                    }
-                    continue;
-                }
-                printf("%d. %s %d : %s %.03lf %.03lf %d\n", count++, db[fi].items[j].name, db[fi].items[j].price, db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
+    rewind(warehouseFp);
+
+    while (fgets(line, lineLen, warehouseFp)) { // get data
+        word = j = 0;
+
+        for (int i = 0; i < (int)strlen(line); i++) {
+            if (line[i] == ' ') {
+                lineWords[word][j] = '\0';
+                word++;
+                j = 0;
+            } else {
+                lineWords[word][j] = line[i];
+                j++;
             }
         }
-    } else {
-        for (int i = 0; i < size; i++) {
-            count = 1;
-            int fi = filteredIndexes[i];
-            printf("%s %.03lf %.03lf %d :\n", db[fi].name, db[fi].gps.lat, db[fi].gps.lon, db[fi].n);
-            for (int j = 0; j < db[fi].n; j++) {
-                if (optT.flag) {
-                    if (!strcmp(db[fi].items[j].name, optT.arg)) {
-                        printf("%d. %s %d\n", count++, db[fi].items[j].name, db[fi].items[j].price);
-                    }
-                    continue;
-                } else if (optP.flag) {
-                    if (db[fi].items[j].price <= atoi(optP.arg)) {
-                        printf("%d. %s %d\n", count++, db[fi].items[j].name, db[fi].items[j].price);
-                    }
-                    continue;
-                }
-                printf("%d. %s %d\n", count++, db[fi].items[j].name, db[fi].items[j].price);
-            }
+        strcpy((*db)[k].name, lineWords[0]);
+        (*db)[k].gps.lat = strtod(lineWords[1], NULL);
+        (*db)[k].gps.lon = strtod(lineWords[2], NULL);
+        (*db)[k].capacity = atoi(lineWords[3]);
+        k++;
+    }
+    fclose(warehouseFp);
+
+    return dbNum;
+}
+
+char *getFolder() {
+    char *folder = malloc(9*sizeof(char));
+    strcpy(folder, ".");
+    strcat(folder, PATH_SEPARATOR);
+    strcat(folder, ITEMS_FOLDER);
+    strcat(folder, PATH_SEPARATOR);
+    return folder;
+}
+
+void getItems(WAREHOUSE **db, int dbNum) {
+    FILE *itemFile;
+    char *folder = getFolder();
+    char fileName[MAX_NAME+5] = "";
+    strcpy(fileName, folder);
+
+    for (int i = 0; i < dbNum; i++) {
+        strcat(fileName, (*db)[i].name);
+        strcat(fileName, ".txt");
+        itemFile = fopen(fileName, "r");
+        if (itemFile == NULL) { // if file doesn't exist
+            fprintf(stderr, "%s %s\n", "FILE_ERROR", fileName);
+            strcpy((*db)[i].name, EMPTY_STR);
+        } else {
+            fclose(itemFile);
         }
+        strcpy(fileName, folder);
     }
 }
 
-int main(int argc, char *argv[]) {
-	int appOpt; // options from terminal
-	char *optstring = ":w:i:n:e:t:p:W";
-    OPT optSmallW = setOptDefault();
-    OPT optI= setOptDefault();
-    OPT optN = setOptDefault();
-    OPT optE = setOptDefault();
-    OPT optT = setOptDefault();
-    OPT optP = setOptDefault();
-    OPT optW = setOptDefault();
-    int filteredIndexes[DB_NUM] = {0};
-    int filteredNum = 0;
+void printWarehouses(WAREHOUSE *db, int dbNum) {
+    for (int i = 0; i < dbNum; i++) {
+      if (strcmp(db[i].name, EMPTY_STR) == 0) { continue; }
+        printf("%s %.03lf %.03lf %d\n", db[i].name, db[i].gps.lat, db[i].gps.lon, db[i].capacity);
+    }
+}
+
+int main(int argc, char *argv[]){
+    int appOpt; // options from terminal
+	char *optstring = ":w:n:e:ad";
+    OPT optw = setOptDefault();
+    OPT optn = setOptDefault();
+    OPT opte = setOptDefault();
+    bool opta = false;
+    bool optd = false;
+    WAREHOUSE *db;
+    int dbNum = 0;
 
     while ((appOpt = getopt(argc, argv, optstring)) != -1) { // get options
         switch (appOpt) {
+            // warehouse filter - default: all warehouses
             case 'w': // warehouse name arg (case-sensitive)
-                optSmallW = setOpt(true, getOptArgument(appOpt, argc, argv));
+                optw = setOpt(true, getOptArgument(appOpt, argc, argv));
                 break;
-            case 'i': // warehouse item_name arg (case-sensitive)
-                optI = setOpt(true, getOptArgument(appOpt, argc, argv));
-                break;
-            case 'n': // warehouse lat(itude)
-            	optN = setOpt(true, getOptArgument(appOpt, argc, argv));
+            case 'n': // warehouse lat(itude) arg
+            	optn = setOpt(true, getOptArgument(appOpt, argc, argv));
             	break;
-            case 'e': // warehouse lon(gitude)
-                optE = setOpt(true, getOptArgument(appOpt, argc, argv));
+            case 'e': // warehouse lon(gitude) arg
+                opte = setOpt(true, getOptArgument(appOpt, argc, argv));
                 break;
-            case 't': // item_name
-                optT = setOpt(true, getOptArgument(appOpt, argc, argv));
+            // warehouse sort - default: warehouse sort by name asc
+            case 'a': // items sort by price asc
+                opta = true;
                 break;
-            case 'p': // item max_price
-            	optP = setOpt(true, getOptArgument(appOpt, argc, argv));
-            	break;
-            case 'W': // sklado-centricky vypis
-            	optW = setOpt(true, getOptArgument(appOpt, argc, argv));
-            	break;
+            case 'd': // items sort by price desc
+                optd = true;
+                break;
             case '?':
-                return 1; // situation 1 - invalid option
+                return 1; // error: invalid option
             case ':':
-                return 2; // situation 2 - no parameter(arg) after option
-            default: // without opt - all warehouses // tovaro-centricky vypis
+                return 2; // error: no parameter(arg) after option
+            default:
                 break;
         }
     }
-    // other error situations
-    if ((optN.flag != optE.flag)) {
-        return 3; // situation 3 - -n and -e must be entered together
-    }
-    if (optN.flag && optE.flag) {
-        double lat = strtod(optN.arg, NULL);
-        double lon = strtod(optE.arg, NULL);
-        if (!(isStrNumber(lat, optN.arg) && isStrNumber(lon, optE.arg) &&
-            (lat <= 90 || lat >= -90) && (lon <= 180 || lon >= -180))) {
-            return 4; // situation 4 - latitude is not in range <-90,90> or longitude is not in range <-180,180> or they are not a number
-        }
-    }
 
-    // filter warehouses by "" or -w or -i or (-n and -e)
-    if (optSmallW.flag) {
-        int j = 0;
-        for (int i = 0; i < DB_NUM; i++) {
-            if (!strcmp(db[i].name, optSmallW.arg)) {
-                filteredIndexes[j++] = i;
-            }
-        }
-        filteredNum = j;
-    } else if (optI.flag) {
-        int k = 0;
-        for (int i = 0; i < DB_NUM; i++) {
-            for (int j = 0; j < db[i].n; j++) {
-                if (!strcmp(db[i].items[j].name, optI.arg)) {
-                    filteredIndexes[k++] = i;
-                    break;
-                }
-            }
-        }
-        filteredNum = k;
-    } else if (optN.flag && optE.flag) {
-        filteredIndexes[0] = getGPSClosestIndex(optN.arg, optE.arg);
-        filteredNum = 1;
-    } else {
-        for (int i = 0; i < DB_NUM; i++) {
-            filteredIndexes[i] = i;
-        }
-        filteredNum = DB_NUM;
-    }
+    dbNum = getWarehouses(&db); // get warehouses data and number of them
+    // error situation 1 - warehouse has no items txt file, no return, ignore missing warehouse;
+    getItems(&db, dbNum);
 
-    printDB(filteredIndexes, filteredNum, !optW.flag, optT, optP);
+    // error situation 2 - num of items in file > capacity, no return, ignore warehouse
+    // TODO function fprintf(stderr, "CAPACITY_ERROR name.txt\n", MAX_NAME+23);
 
-	return 0;
+    // error situation 3 - wrong item file format, no return, ignore warehouse
+    // TODO function fprintf(stderr, "FORMAT_ERROR name.txt\n", MAX_NAME+23);
+    printWarehouses(db, dbNum);
+
+    free(db);
+
+    return 0; 
 }
